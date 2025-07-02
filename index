@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Outil de vérification (spec tech)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #f1f5f9;
+      margin: 0;
+      padding: 0;
+      color: #1e293b;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background-color: #ffffff;
+      padding: 20px 40px;
+      border-bottom: 2px solid #e2e8f0;
+    }
+    header img {
+      height: 40px;
+    }
+    h1 {
+      font-size: 1.8rem;
+      font-weight: 600;
+      margin: 0;
+    }
+    main {
+      padding: 40px;
+    }
+    .filter {
+      margin-bottom: 20px;
+    }
+    .drop-zone {
+      border: 2px dashed #0088CE;
+      padding: 40px;
+      text-align: center;
+      background-color: #ffffff;
+      margin-bottom: 30px;
+      border-radius: 12px;
+      transition: background-color 0.3s ease;
+    }
+    .drop-zone.hover {
+      background-color: #e0f2ff;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #ffffff;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+    }
+    th, td {
+      border: 1px solid #e2e8f0;
+      padding: 12px;
+      text-align: center;
+    }
+    th {
+      background-color: #0088CE;
+      color: white;
+      font-weight: 600;
+    }
+    .ok {
+      color: #10b981;
+      font-weight: bold;
+    }
+    .nok {
+      color: #ef4444;
+      font-weight: bold;
+    }
+    .badge {
+      display: inline-block;
+      margin: 2px;
+      padding: 4px 8px;
+      border-radius: 20px;
+      font-size: 0.8em;
+      font-weight: 600;
+    }
+    .badge.WEB {
+      background-color: #dbeafe;
+      color: #1e40af;
+    }
+    .badge.APP {
+      background-color: #ede9fe;
+      color: #6b21a8;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Outil de vérification (spec tech)</h1>
+    
+  </header>
+  <main>
+    <div class="filter">
+      <label for="deviceFilter">Filtrer par device : </label>
+      <select id="deviceFilter">
+        <option value="ALL">Tous</option>
+        <option value="APP">APP</option>
+        <option value="WEB">WEB</option>
+      </select>
+    </div>
+    <div class="drop-zone" id="drop-zone">Glissez vos images ici</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Nom</th>
+          <th>Dimensions</th>
+          <th>Poids (Ko)</th>
+          <th>Format</th>
+          <th>Correspondance</th>
+          <th>Statut</th>
+        </tr>
+      </thead>
+      <tbody id="result-body"></tbody>
+    </table>
+  </main>
+  <script>
+    const specFormats = [
+      { tailles: ["320x100"], nom: "Megaban", context: "APP", formats: ["jpg", "png", "gif", "html"], poidsMax: 55 },
+      { tailles: ["320x100"], nom: "Megaban", context: "WEB", formats: ["jpg", "png", "gif", "html"], poidsMax: 55 },
+      { tailles: ["320x100"], nom: "GrandAngle (responsive)", context: "WEB", formats: ["jpg", "png", "gif", "html"], poidsMax: 55 },
+      { tailles: ["320x100"], nom: "Masthead (responsive)", context: "WEB", formats: ["jpg", "png", "gif", "html"], poidsMax: 55 },
+      { tailles: ["300x250"], nom: "Pavé", context: "APP", formats: ["jpg", "png", "gif", "html"], poidsMax: 55 },
+      { tailles: ["300x250"], nom: "Pavé", context: "WEB", formats: ["jpg", "png", "gif", "html"], poidsMax: 55 },
+      { tailles: ["320x50"], nom: "Sticky", context: "APP", formats: ["jpg", "png", "gif", "html"], poidsMax: 55 },
+      { tailles: ["680x1024"], nom: "Interstitiel Non cliquable", context: "APP", formats: ["jpg", "png"], poidsMax: 200 },
+      { tailles: ["656x280"], nom: "Native 1 ou 2 CC / BP1", context: "APP", formats: ["jpg", "png"], poidsMax: 55 },
+      { tailles: ["300x300"], nom: "BP 2/3/4", context: "APP", formats: ["jpg", "png"], poidsMax: 55 },
+      { tailles: ["728x90"], nom: "Megaban", context: "WEB", formats: ["jpg", "png", "gif", "html"], poidsMax: 55 },
+      { tailles: ["970x250"], nom: "Masthead", context: "WEB", formats: ["jpg", "png", "gif", "html"], poidsMax: 55 },
+      { tailles: ["300x600"], nom: "GrandAngle", context: "WEB", formats: ["jpg", "png", "gif", "html"], poidsMax: 55 },
+      { tailles: ["1024x580"], nom: "Interstitiel Non cliquable", context: "WEB", formats: ["jpg", "png"], poidsMax: 200 },
+      { tailles: ["320x480"], nom: "Interstitiel Non cliquable", context: "WEB", formats: ["jpg", "png"], poidsMax: 200 },
+      { tailles: ["300x300"], nom: "BP 2/3/4", context: "WEB", formats: ["jpg", "png"], poidsMax: 55 }
+    ];
+
+    const dropZone = document.getElementById('drop-zone');
+    const resultBody = document.getElementById('result-body');
+    const deviceFilter = document.getElementById('deviceFilter');
+
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('hover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('hover'));
+
+    let currentFilter = 'ALL';
+    deviceFilter.addEventListener('change', () => {
+      currentFilter = deviceFilter.value;
+      updateVisibility();
+    });
+
+    function updateVisibility() {
+      document.querySelectorAll('#result-body tr').forEach(row => {
+        const ctx = row.getAttribute('data-context');
+        row.style.display = (currentFilter === 'ALL' || ctx.includes(currentFilter)) ? '' : 'none';
+      });
+    }
+
+    dropZone.addEventListener('drop', async e => {
+      e.preventDefault();
+      dropZone.classList.remove('hover');
+
+      const files = Array.from(e.dataTransfer.files);
+
+      for (const file of files) {
+        const fileReader = new FileReader();
+        fileReader.onload = event => {
+          const img = new Image();
+          img.onload = () => {
+            const width = img.width;
+            const height = img.height;
+            const sizeKo = +(file.size / 1024).toFixed(1);
+            const ext = file.name.split('.').pop().toLowerCase();
+            const key = `${width}x${height}`;
+
+            const matches = specFormats.filter(f => f.tailles.includes(key));
+
+            if (matches.length === 0) {
+              const row = `<tr data-context="none">
+                <td>${file.name}</td><td>${width}x${height}</td><td>${sizeKo}</td><td>${ext}</td>
+                <td>-</td><td><span class="nok">Non conforme : taille non reconnue</span></td>
+              </tr>`;
+              resultBody.insertAdjacentHTML('beforeend', row);
+              return;
+            }
+
+            let anyConforme = false;
+            let correspondances = [];
+            let errorDetails = [];
+
+            matches.forEach(match => {
+              const badge = `<span class="badge ${match.context}">${match.nom} (${key}) - ${match.context}</span>`;
+              correspondances.push(badge);
+              const formatOk = match.formats.includes(ext);
+              const poidsOk = sizeKo <= match.poidsMax;
+
+              if (formatOk && poidsOk) {
+                anyConforme = true;
+              } else {
+                let d = [];
+                if (!formatOk) d.push(`format non autorisé (${ext})`);
+                if (!poidsOk) d.push(`dépasse ${Math.round(sizeKo - match.poidsMax)} Ko`);
+                errorDetails.push(`${match.nom} - ${match.context} : ${d.join(', ')}`);
+              }
+            });
+
+            const status = anyConforme
+              ? '<span class="ok">Conforme</span>'
+              : `<span class="nok">Non conforme : ${errorDetails.join(' | ')}</span>`;
+
+            const row = `<tr data-context="${matches.map(m => m.context).join(',')}">
+              <td>${file.name}</td><td>${width}x${height}</td><td>${sizeKo}</td><td>${ext}</td>
+              <td>${correspondances.join(' ')}</td><td>${status}</td>
+            </tr>`;
+            resultBody.insertAdjacentHTML('beforeend', row);
+            updateVisibility();
+          };
+          img.src = event.target.result;
+        };
+        fileReader.readAsDataURL(file);
+      }
+    });
+  </script>
+</body>
+</html>
